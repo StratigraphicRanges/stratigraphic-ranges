@@ -21,8 +21,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Reads a real posterior tree sample, builds the SR {@link CladeSystem} (bifurcation,
- * within-range bifurcation and sampled-ancestor clades) and the maximum-clade-credibility
+ * Reads a real posterior tree sample, builds the SR {@link CladeSystem} (budding,
+ * within-range budding and sampled-ancestor clades) and the maximum-clade-credibility
  * (MCC) tree, mirroring exactly the pipeline of {@link sr.treeannotator.SRTreeAnnotator}
  * with {@code clades=true}:
  *
@@ -116,7 +116,7 @@ public class MccCladeSystemTest {
         }
         arr.append("};");
         System.out.println(arr);
-        System.out.println("Bifurcation clades:        " + system.getBifurcationMap().size());
+        System.out.println("Budding clades:        " + system.getBuddingMap().size());
         System.out.println("Within-range clades:       " + system.getWithinRangeMap().size());
         System.out.println("Sampled-ancestor clades:   " + system.getSampledAncestorMap().size());
         System.out.println();
@@ -124,15 +124,15 @@ public class MccCladeSystemTest {
 
         // --- sanity checks on the overall shape --------------------------------------
         assertTrue("the clade system should not be empty",
-                system.getBifurcationMap().size()
+                system.getBuddingMap().size()
                         + system.getWithinRangeMap().size()
                         + system.getSampledAncestorMap().size() > 0);
         assertTrue("the clade system should contain 59 clades",
-                system.getBifurcationMap().size()
+                system.getBuddingMap().size()
                         + system.getWithinRangeMap().size()
                         + system.getSampledAncestorMap().size() == 59);
         // every probability is count/10, so it must lie in (0, 1]
-        for (BuddingClade c : system.getBifurcationMap().values()) {
+        for (BuddingClade c : system.getBuddingMap().values()) {
             assertTrue(c.getProbability() > 0.0 && c.getProbability() <= 1.0);
         }
         for (WithinRangeBuddingClade c : system.getWithinRangeMap().values()) {
@@ -177,7 +177,7 @@ public class MccCladeSystemTest {
                     expectedMccNewick, mccNewick);
         }
 
-           assertEquals(43, system.getBifurcationMap().size());
+           assertEquals(43, system.getBuddingMap().size());
            assertEquals(7, system.getWithinRangeMap().size());
            assertEquals(9, system.getSampledAncestorMap().size());
 

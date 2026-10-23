@@ -15,9 +15,9 @@ import sr.treeannotator.WithinRangeBuddingClade;
 import java.util.*;
 
 /**
- * Guard tests for clade type 2 - the "bifurcation within a range" clade (A, T1, T2).
+ * Guard tests for clade type 2 - the "budding within a range" clade (A, T1, T2).
  *
- * <p>A within-range bifurcation is a budding event that happens while a range A still exists:
+ * <p>A within-range budding is a budding event that happens while a range A still exists:
  * the ancestral (left) lineage continues the range A and the descendant (right) lineage is a
  * newly budded species. In the SA tree (obtained from the SR tree by omitting first occurrences)
  * such a node is the MRCA of {A} ∪ T, and the clade is denoted (A, T1, T2), where T1 are the
@@ -42,11 +42,11 @@ public class WithinRangeCladeTest extends TestCase {
      *
      *   (F_first:0.0,(F_last:2.0,G:2.0):1.0):3.0
      *
-     * In the SA tree the first occurrence F_first is removed and the bifurcation X = (F_last, G)
+     * In the SA tree the first occurrence F_first is removed and the budding X = (F_last, G)
      * is the within-range MRCA. The only clade is (F, {}, {G}).
      */
     @Test
-    public void testSingleWithinRangeBifurcation() throws Exception {
+    public void testSingleWithinRangeBudding() throws Exception {
         CladeSystem system = new CladeSystem();
         SRTree tree = createTree("(F_first:0.0,(F_last:2.0,G:2.0):1.0):3.0", "F_first", "F_last", "G");
         system.add(tree, false);
@@ -57,7 +57,7 @@ public class WithinRangeCladeTest extends TestCase {
 
         // Exactly one within-range clade and nothing else.
         assertEquals("only one within-range clade", 1, system.getWithinRangeMap().size());
-        assertEquals("no plain bifurcation clades", 0, system.getBifurcationMap().size());
+        assertEquals("no plain bifurcation clades", 0, system.getBuddingMap().size());
         assertEquals("no sampled-ancestor clades", 0, system.getSampledAncestorMap().size());
 
         WithinRangeBuddingClade clade = wrb(system, "F", set(), set("G"));
@@ -77,7 +77,7 @@ public class WithinRangeCladeTest extends TestCase {
      * Upper node Y = (X, G)       -> (F, {H}, {G})   (H is the ancestral-side taxon, G the budded one)
      */
     @Test
-    public void testWithinRangeBifurcationWithNonEmptyT1() throws Exception {
+    public void testWithinRangeBuddingWithNonEmptyT1() throws Exception {
         CladeSystem system = new CladeSystem();
         SRTree tree = createTree("(F_first:0.0,((F_last:2.0,H:2.0):1.0,G:3.0):1.0):4.0",
                 "F_first", "F_last", "G", "H");
@@ -88,7 +88,7 @@ public class WithinRangeCladeTest extends TestCase {
         System.out.println(system.getSummary());
 
         assertEquals("two within-range clades", 2, system.getWithinRangeMap().size());
-        assertEquals("no plain bifurcation clades", 0, system.getBifurcationMap().size());
+        assertEquals("no plain bifurcation clades", 0, system.getBuddingMap().size());
         assertEquals("no sampled-ancestor clades", 0, system.getSampledAncestorMap().size());
 
         assertNotNull("(F, {}, {H}) should exist", wrb(system, "F", set(), set("H")));
@@ -146,7 +146,7 @@ public class WithinRangeCladeTest extends TestCase {
      * (so G is present via itself and H via its tip), and that the two clade types coexist.
      */
     @Test
-    public void testWithinRangeBifurcationWithSampledAncestorDescendant() throws Exception {
+    public void testWithinRangeBuddingWithSampledAncestorDescendant() throws Exception {
         CladeSystem system = new CladeSystem();
         SRTree tree = createTree("(F_first:0.0,(F_last:4.0,(G:0.0,H:3.0):1.0):1.0):5.0",
                 "F_first", "F_last", "G", "H");
@@ -158,7 +158,7 @@ public class WithinRangeCladeTest extends TestCase {
 
         assertEquals("one within-range clade", 1, system.getWithinRangeMap().size());
         assertEquals("one sampled-ancestor clade", 1, system.getSampledAncestorMap().size());
-        assertEquals("no plain bifurcation clades", 0, system.getBifurcationMap().size());
+        assertEquals("no plain bifurcation clades", 0, system.getBuddingMap().size());
 
         assertNotNull("(F, {}, {G,H}) should exist", wrb(system, "F", set(), set("G", "H")));
 
@@ -173,7 +173,7 @@ public class WithinRangeCladeTest extends TestCase {
      * When trees are built via {@link SRTree#assignFrom} (the annotator's file-reading path), the
      * StratigraphicRange only records the first and last occurrence node numbers; the internal
      * branching nodes are never added. Consequently {@code tree.getRangeOfNode(X)} returns null for
-     * a within-range bifurcation X. This test asserts that situation explicitly, and that the
+     * a within-range budding X. This test asserts that situation explicitly, and that the
      * CladeSystem still classifies X as a within-range clade (because it reconstructs membership
      * structurally by walking up from the last occurrence).
      */
@@ -181,12 +181,12 @@ public class WithinRangeCladeTest extends TestCase {
     public void testWithinRangeDetectionDoesNotRelyOnRangeNodeList() throws Exception {
         SRTree tree = createTree("(F_first:0.0,(F_last:2.0,G:2.0):1.0):3.0", "F_first", "F_last", "G");
 
-        // X is the within-range bifurcation = parent of the F_last leaf.
+        // X is the within-range budding = parent of the F_last leaf.
         Node fLast = leaf(tree, "F_last");
         assertNotNull("F_last leaf found", fLast);
         Node x = fLast.getParent();
-        assertNotNull("within-range bifurcation X found", x);
-        assertFalse("X is a genuine bifurcation, not a fake node", x.isFake());
+        assertNotNull("within-range budding X found", x);
+        assertFalse("X is a genuine budding, not a fake node", x.isFake());
 
         // The range node list does NOT contain X, so getRangeOfNode would misclassify it.
         assertNull("getRangeOfNode(X) is null because internal nodes are not recorded",
