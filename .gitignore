@@ -10,7 +10,17 @@
 
 # OS X ignores
 .DS_Store
+#build
 /build/
+/dist/
+*.zip
+*.jar
+
+#BEAST logs
+*.trees
+*.log
+*.state
+
 
 # treeannotator definitions (not public yet)
 /src/sr/treeannotator/Summarizing_SR_trees.pdf

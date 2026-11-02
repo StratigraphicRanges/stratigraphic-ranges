@@ -10,7 +10,7 @@
                 args=""
     />
 
-    <packageapp description="SRangesAndSACladeSetComparator"
+    <packageapp description="SRangesCladeSetComparator"
                 class="sr.util.loggers.SRangesCladeSetComparator"
                 args=""
     />

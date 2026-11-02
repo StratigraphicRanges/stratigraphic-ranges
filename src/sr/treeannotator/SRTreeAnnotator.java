@@ -134,19 +134,13 @@ public class SRTreeAnnotator extends Runnable {
         Log.info("Step 1: Collecting " + (useClades ? "clades" : "relationships") + " and attributes from trees...");
         TreeSummarizer summarizer = useClades ? new CladeSystem() : new RelationshipSystem();
 
-        int counter = 0;
+        ProgressBar progress = new ProgressBar(totalTreesUsed);
         for (SRTree tree : analyzedTrees) {
             // Collect features WITH heights for annotation
             summarizer.add(tree, true);
-            counter++;
-            if (counter % 100 == 0) {
-                Log.info.print(".");
-                if (counter % 1000 == 0) {
-                    Log.info.print(" " + counter);
-                }
-            }
+            progress.step();
         }
-        Log.info("");
+        progress.finish();
         Log.info("Collected " + (useClades ? "clades" : "relationships") + " from " + totalTreesUsed + " trees.");
 
         // Calculate posterior probabilities
@@ -160,15 +154,11 @@ public class SRTreeAnnotator extends Runnable {
 
         // Step 2: Find MCC tree
         Log.info("Step 2: Finding maximum credibility tree...");
-        Log.info("0              25             50             75            100");
-        Log.info("|--------------|--------------|--------------|--------------|");
 
         SRTree bestTree = null;
         double bestScore = Double.NEGATIVE_INFINITY;
 
-        counter = 0;
-        int reported = 0;
-
+        progress = new ProgressBar(totalTreesUsed);
         for (SRTree tree : analyzedTrees) {
             double score;
             if (useSumCredibility) {
@@ -182,16 +172,9 @@ public class SRTreeAnnotator extends Runnable {
                 bestScore = score;
             }
 
-            // Progress bar
-            while (reported < 61 && 1000.0 * reported < 61000.0 * (counter + 1) / totalTreesUsed) {
-                Log.info.print("*");
-                reported++;
-            }
-            counter++;
+            progress.step();
         }
-
-        Log.info("");
-        Log.info("");
+        progress.finish();
 
         String credibilityLabel = useClades ? "Clade" : "Relationship";
         if (useSumCredibility) {
@@ -225,9 +208,17 @@ public class SRTreeAnnotator extends Runnable {
 
         // Try Nexus format first
         try {
-            NexusParser parser = new NexusParser();
-            parser.parseFile(new File(inputFileName));
+            int totalTrees = countTreeLines();
+            Log.info("Parsing " + totalTrees + " trees...");
+            ProgressBar parseProgress = new ProgressBar(totalTrees);
 
+            NexusParser parser = new NexusParser();
+            parser.addListener((treeIndex, tree) -> parseProgress.step());
+            parser.parseFile(new File(inputFileName));
+            parseProgress.finish();
+
+            Log.info("Orientating trees...");
+            ProgressBar progress = new ProgressBar(parser.trees.size());
             for (Tree tree : parser.trees) {
                 if (tree instanceof SRTree) {
                     trees.add((SRTree) tree);
@@ -238,7 +229,9 @@ public class SRTreeAnnotator extends Runnable {
                     srTree.orientateTree();
                     trees.add(srTree);
                 }
+                progress.step();
             }
+            progress.finish();
         } catch (Exception e) {
             // If Nexus parsing fails, try reading as Newick
             Log.info("Nexus parsing failed, trying Newick format...");
@@ -246,6 +239,57 @@ public class SRTreeAnnotator extends Runnable {
         }
 
         return trees;
+    }
+
+    /**
+     * Counts the number of "tree ..." lines in the input file, so that progress
+     * can be reported while parsing. Cheap compared to actual parsing.
+     */
+    private int countTreeLines() throws IOException {
+        int count = 0;
+        try (BufferedReader reader = new BufferedReader(new FileReader(inputFileName))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().toLowerCase().startsWith("tree ")) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Text progress bar in the style of BEAST's TreeAnnotator: prints a header
+     * with 0/25/50/75/100 marks, then one '*' per ~1/61 of the total.
+     */
+    private static class ProgressBar {
+        private final int total;
+        private int done = 0;
+        private int reported = 0;
+
+        ProgressBar(int total) {
+            this.total = Math.max(total, 1);
+            Log.info("0              25             50             75            100");
+            Log.info("|--------------|--------------|--------------|--------------|");
+        }
+
+        void step() {
+            done++;
+            while (reported < 61 && 1000.0 * reported < 61000.0 * done / total) {
+                Log.info.print("*");
+                reported++;
+            }
+            Log.info.flush();
+        }
+
+        void finish() {
+            while (reported < 61) {
+                Log.info.print("*");
+                reported++;
+            }
+            Log.info("");
+            Log.info("");
+        }
     }
 
     /**
