@@ -83,10 +83,10 @@ public class SRTreeAnnotator extends Runnable {
         inputFileName = treesInput.get().getPath();
         outputFileName = outputInput.get().getPath();
         burninPercentage = burnInPercentageInput.get();
-        useSumCredibility = useSumInput.get();
-        annotateRelationshipDetails = detailedInput.get();
-        useClades = useCladesInput.get();
-        lowMemory = lowMemInput.get();
+        useSumCredibility = isSet(useSumInput);
+        annotateRelationshipDetails = isSet(detailedInput);
+        useClades = isSet(useCladesInput);
+        lowMemory = isSet(lowMemInput);
 
         if (summaryInput.get() != null && !summaryInput.get().getName().equals("[[none]]")) {
             summaryFileName = summaryInput.get().getPath();
@@ -103,6 +103,11 @@ public class SRTreeAnnotator extends Runnable {
         }
 
         annotate();
+    }
+
+    /** Null-safe read of a boolean flag input. */
+    private static boolean isSet(Input<Boolean> input) {
+        return input.get() != null && input.get();
     }
 
     /**
@@ -288,6 +293,13 @@ public class SRTreeAnnotator extends Runnable {
             SRTreeAnnotatorGui.launchGui(args);
             return;
         }
-        new Application(new SRTreeAnnotator(), "SR Tree Annotator", args);
+        SRTreeAnnotator annotator = new SRTreeAnnotator();
+        // Application.parseArgs() only recognises bare boolean flags (e.g. "-clades")
+        // when the input's type is already known; it determines the type against the
+        // wrong owner, so resolve the types here against the annotator itself.
+        for (Input<?> input : annotator.listInputs()) {
+            input.determineClass(annotator);
+        }
+        new Application(annotator, "SR Tree Annotator", args);
     }
 }
