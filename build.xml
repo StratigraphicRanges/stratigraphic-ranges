@@ -255,6 +255,7 @@
             <classpath>
                 <pathelement path=""/>
                 <fileset dir="${build-lib}" includes="*.jar"/>
+                <fileset dir="${javafxDir}" includes="*.jar" erroronmissingdir="false"/>
             </classpath>
         </javac>
     </target>

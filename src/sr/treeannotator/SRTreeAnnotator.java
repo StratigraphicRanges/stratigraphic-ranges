@@ -358,6 +358,12 @@ public class SRTreeAnnotator extends Runnable {
      * Command-line interface via BEAST Application framework.
      */
     public static void main(String[] args) throws Exception {
+        if (args.length == 0) {
+            // No arguments: show the GUI. Done in our own Console subclass rather than
+            // via Application so that the analysis runs off the JavaFX thread.
+            SRTreeAnnotatorGui.launchGui(args);
+            return;
+        }
         new Application(new SRTreeAnnotator(), "SR Tree Annotator", args);
     }
 }
