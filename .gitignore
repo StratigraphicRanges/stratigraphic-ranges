@@ -33,3 +33,4 @@
 # ignore hidden, except gitignote
 /.*
 !/.gitignore
+/build-test

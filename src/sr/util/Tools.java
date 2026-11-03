@@ -34,7 +34,9 @@ public class Tools {
 	public static void orientateNodeChildren(int subtreeRootNr, Tree tree) {
 		Node subTreeRoot = tree.getNode(subtreeRootNr);
 		if (!subTreeRoot.isLeaf()) {
-			((SRNode) subTreeRoot).setBudding(!subTreeRoot.metaDataString.contains("budding=false"));
+			// Trees without node metadata (e.g. plain simulated trees) default to budding
+			String meta = subTreeRoot.metaDataString;
+			((SRNode) subTreeRoot).setBudding(meta == null || !meta.contains("budding=false"));
 			
 			if ((!subTreeRoot.isFake() && ((SRNode) subTreeRoot).isBudding() 
 					&& subTreeRoot.getChild(0).metaDataString != null && !subTreeRoot.getChild(0).metaDataString.contains("orientation=ancestor"))

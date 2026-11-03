@@ -3,19 +3,17 @@ package sr.treeannotator;
 import beast.base.core.Description;
 import beast.base.core.Input;
 import beast.base.core.Log;
-import beast.base.evolution.tree.Tree;
-import beast.base.evolution.tree.TreeParser;
 import beast.base.inference.Runnable;
-import beast.base.parser.NexusParser;
 import beastfx.app.tools.Application;
 import beastfx.app.util.OutFile;
 import beastfx.app.util.TreeFile;
 import sr.evolution.tree.SRNode;
 import sr.evolution.tree.SRTree;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 
 /**
  * Tree annotator for stratigraphic-range (SR) trees using relationship-based
@@ -60,6 +58,11 @@ public class SRTreeAnnotator extends Runnable {
                     "ancestor clades) instead of relationship-based credibility",
             false);
 
+    final public Input<Boolean> lowMemInput = new Input<>("lowMem",
+            "Use less memory by parsing one tree at a time and re-reading the input file " +
+                    "for each pass, which is a bit slower",
+            false);
+
     private String inputFileName;
     private String outputFileName;
     private String summaryFileName;
@@ -67,6 +70,7 @@ public class SRTreeAnnotator extends Runnable {
     private boolean useSumCredibility;
     private boolean annotateRelationshipDetails;
     private boolean useClades;
+    private boolean lowMemory;
 
     @Override
     public void initAndValidate() {
@@ -82,6 +86,7 @@ public class SRTreeAnnotator extends Runnable {
         useSumCredibility = useSumInput.get();
         annotateRelationshipDetails = detailedInput.get();
         useClades = useCladesInput.get();
+        lowMemory = lowMemInput.get();
 
         if (summaryInput.get() != null && !summaryInput.get().getName().equals("[[none]]")) {
             summaryFileName = summaryInput.get().getPath();
@@ -112,32 +117,38 @@ public class SRTreeAnnotator extends Runnable {
         }
         Log.info("");
 
-        // Read trees from file
-        List<SRTree> trees = readTrees();
+        // Count trees and determine burnin; trees are parsed lazily per pass
+        Log.info("Reading trees from: " + inputFileName);
+        SRTreeSet treeSet = new SRTreeSet(inputFileName, burninPercentage, lowMemory);
+        int totalTreesUsed = treeSet.treesToUse();
 
-        if (trees.isEmpty()) {
-            throw new IllegalArgumentException("No trees found in input file");
-        }
-
-        Log.info("Total trees in file: " + trees.size());
-
-        // Apply burnin
-        int burninCount = (burninPercentage * trees.size()) / 100;
-        List<SRTree> analyzedTrees = trees.subList(burninCount, trees.size());
-        int totalTreesUsed = analyzedTrees.size();
-
-        Log.info("Burnin: " + burninPercentage + "% (" + burninCount + " trees)");
+        Log.info("Total trees in file: " + treeSet.totalTrees());
+        Log.info("Burnin: " + burninPercentage + "% (" + treeSet.burninCount() + " trees)");
         Log.info("Trees to analyze: " + totalTreesUsed);
         Log.info("");
 
+        if (totalTreesUsed == 0) {
+            throw new IllegalArgumentException("No trees left to analyze after burnin");
+        }
+
+        if (!lowMemory) {
+            // Fast mode: parse all post-burnin trees once, up front
+            Log.info("Parsing trees...");
+            ProgressBar parseProgress = new ProgressBar(totalTreesUsed);
+            treeSet.preload(parseProgress::step);
+            parseProgress.finish();
+        }
+
         // Phase 1: Collect features (relationships or clades) and compute probabilities
-        Log.info("Step 1: Collecting " + (useClades ? "clades" : "relationships") + " and attributes from trees...");
+        Log.info("Step 1: Collecting " + (useClades ? "clades" : "relationships")
+                + " and attributes...");
         TreeSummarizer summarizer = useClades ? new CladeSystem() : new RelationshipSystem();
 
         ProgressBar progress = new ProgressBar(totalTreesUsed);
-        for (SRTree tree : analyzedTrees) {
+        treeSet.reset();
+        while (treeSet.hasNext()) {
             // Collect features WITH heights for annotation
-            summarizer.add(tree, true);
+            summarizer.add(treeSet.next(), true);
             progress.step();
         }
         progress.finish();
@@ -159,7 +170,9 @@ public class SRTreeAnnotator extends Runnable {
         double bestScore = Double.NEGATIVE_INFINITY;
 
         progress = new ProgressBar(totalTreesUsed);
-        for (SRTree tree : analyzedTrees) {
+        treeSet.reset();
+        while (treeSet.hasNext()) {
+            SRTree tree = treeSet.next();
             double score;
             if (useSumCredibility) {
                 score = summarizer.getSumCredibility(tree);
@@ -199,66 +212,6 @@ public class SRTreeAnnotator extends Runnable {
     }
 
     /**
-     * Reads SR trees from input file.
-     */
-    private List<SRTree> readTrees() throws Exception {
-        Log.info("Reading trees from: " + inputFileName);
-
-        List<SRTree> trees = new ArrayList<>();
-
-        // Try Nexus format first
-        try {
-            int totalTrees = countTreeLines();
-            Log.info("Parsing " + totalTrees + " trees...");
-            ProgressBar parseProgress = new ProgressBar(totalTrees);
-
-            NexusParser parser = new NexusParser();
-            parser.addListener((treeIndex, tree) -> parseProgress.step());
-            parser.parseFile(new File(inputFileName));
-            parseProgress.finish();
-
-            Log.info("Orientating trees...");
-            ProgressBar progress = new ProgressBar(parser.trees.size());
-            for (Tree tree : parser.trees) {
-                if (tree instanceof SRTree) {
-                    trees.add((SRTree) tree);
-                } else {
-                    // Try to convert to SRTree
-                    SRTree srTree = new SRTree();
-                    srTree.assignFrom(tree);
-                    srTree.orientateTree();
-                    trees.add(srTree);
-                }
-                progress.step();
-            }
-            progress.finish();
-        } catch (Exception e) {
-            // If Nexus parsing fails, try reading as Newick
-            Log.info("Nexus parsing failed, trying Newick format...");
-            trees = readNewickTrees();
-        }
-
-        return trees;
-    }
-
-    /**
-     * Counts the number of "tree ..." lines in the input file, so that progress
-     * can be reported while parsing. Cheap compared to actual parsing.
-     */
-    private int countTreeLines() throws IOException {
-        int count = 0;
-        try (BufferedReader reader = new BufferedReader(new FileReader(inputFileName))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.trim().toLowerCase().startsWith("tree ")) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
-    /**
      * Text progress bar in the style of BEAST's TreeAnnotator: prints a header
      * with 0/25/50/75/100 marks, then one '*' per ~1/61 of the total.
      */
@@ -290,35 +243,6 @@ public class SRTreeAnnotator extends Runnable {
             Log.info("");
             Log.info("");
         }
-    }
-
-    /**
-     * Reads trees from Newick format file using TreeParser.
-     */
-    private List<SRTree> readNewickTrees() throws IOException {
-        List<SRTree> trees = new ArrayList<>();
-        BufferedReader reader = new BufferedReader(new FileReader(inputFileName));
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-            line = line.trim();
-            if (line.isEmpty() || line.startsWith("#")) {
-                continue;
-            }
-
-            try {
-                TreeParser parser = new TreeParser(line);
-                SRTree srTree = new SRTree();
-                srTree.assignFrom(parser);
-                srTree.orientateTree();
-                trees.add(srTree);
-            } catch (Exception e) {
-                Log.warning("Warning: Failed to parse tree: " + e.getMessage());
-            }
-        }
-
-        reader.close();
-        return trees;
     }
 
     /**
