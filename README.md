@@ -42,13 +42,18 @@ The Beauti template is currently not available. You can find examples of BEAST2 
 
 ## Tree Summarization
 
-The package includes **SR Tree Annotator**, a tool for summarizing posterior tree samples using relationship-based credibility instead of traditional clade-based methods. This preserves the orientation information unique to SR trees.
+The package includes **SR Tree Annotator**, a tool for summarizing posterior tree samples of SR trees into a maximum credibility tree. Unlike BEAST's TreeAnnotator it preserves the orientation information of SR trees and offers two credibility definitions:
+
+- **Relationship-based credibility** (default): the tree maximizing the product of posterior probabilities of its ancestry relationships (which taxon is a sampled ancestor of which) and orientation relationships (which lineage is ancestral at each budding event).
+- **SR clade-based credibility** (`-clades`): the tree maximizing the product of posterior probabilities of its SR clades: budding clades, within-range budding clades and sampled ancestor clades.
 
 ### Launching from App Launcher (GUI)
 
 1. Open BEAST2 App Launcher
 2. Select **SR Tree Annotator** from the list
 3. Fill in the input/output files and options via the GUI
+
+The analysis runs in the background and progress is shown live in the console window.
 
 ### Command Line Usage
 
@@ -68,9 +73,13 @@ where PATH_TO_APPLAUNCHER:
 | `-trees <file>` | Input tree file (Nexus or Newick format) |
 | `-out <file>` | Output file for the MCC tree |
 | `-burnin <n>` | Burnin percentage (default: 10) |
-| `-sumProbabilities true` | Use sum instead of log product for scoring |
-| `-summary <file>` | Write relationship summary to file |
-| `-detailed true` | Include detailed relationship annotations |
+| `-clades` | Use SR clade-based credibility instead of relationship-based credibility |
+| `-sumProbabilities` | Use sum instead of log product for scoring |
+| `-summary <file>` | Write relationship (or clade) summary to file |
+| `-detailed` | Include detailed relationship (or clade) annotations |
+| `-lowMem` | Use less memory: parse one tree at a time and re-read the input file for each pass |
+
+Boolean options can be given as bare flags (`-clades`) or with an explicit value (`-clades false`).
 
 ### Example
 
@@ -80,16 +89,20 @@ where PATH_TO_APPLAUNCHER:
     -out mcc.tree \
     -burnin 20 \
     -summary relationships.txt \
-    -detailed true
+    -detailed \
+    -lowMem
 ```
 
 ### Output Annotations
 
 The MCC tree is annotated with:
-- `posterior` - relationship probability at each node
-- `height_mean`, `height_median`, `height_95%_HPD` - height statistics
+- `taxon` - base taxon name at each tip (range suffix removed)
+- `posterior` - relationship (or clade) probability at each node
+- `height_mean`, `height_median`, `height_95%_HPD`, `height_range` - height statistics
 
-With `-detailed true`, additional annotations are added:
+With `-detailed`, additional annotations are added.
+
+In relationship mode:
 
 **For ancestry relationships (sampled ancestor nodes):**
 - `relationship_type` = "ancestry"
@@ -100,6 +113,8 @@ With `-detailed true`, additional annotations are added:
 - `relationship_type` = "orientation"
 - `ancestral_taxa` - set of taxa in the ancestral lineage
 - `descendant_taxa` - set of taxa in the descendant lineage
+
+In clade mode (`-clades`), `clade_type` records the kind of SR clade at each node (`budding`, `within_range_budding` or `sampled_ancestor`), with `ancestor_taxon`, `range_taxon`, `ancestral_taxa` and `descendant_taxa` as applicable.
 
 ### Summary File Output
 
@@ -115,7 +130,7 @@ Orientation Relationships:
   ({E} => {F,G}): count=550, prob=0.5500
 ```
 
-Where `count` is the number of trees containing that relationship and `prob` is the posterior probability.
+Where `count` is the number of trees containing that relationship and `prob` is the posterior probability. In clade mode the file lists budding clades, within-range budding clades and sampled ancestor clades in the same format.
 
 ## Model Features
 
