@@ -5,6 +5,7 @@
 - [Output](#output)
 - [Usage](#usage)
 - [Tree Summarization](#tree-summarization)
+- [Clade Set Comparison](#clade-set-comparison)
 - [Model Features](#model-features)
   - [Tree Encoding](#tree-encoding)
   - [Clock and Substitution Models](#clock-and-substitution-models)
@@ -131,6 +132,33 @@ Orientation Relationships:
 ```
 
 Where `count` is the number of trees containing that relationship and `prob` is the posterior probability. In clade mode the file lists budding clades, within-range budding clades and sampled ancestor clades in the same format.
+
+## Clade Set Comparison
+
+Two tools compare clade support and clade ages between tree sets and are available from the BEAST App Launcher or the command line:
+
+- `SRangesCladeSetComparator` compares two sRanges tree sets (or MCC trees).
+- `SRangesAndSACladeSetComparator` compares a sampled ancestor (SA) tree set against an sRanges tree set. The SA log file is needed to read the tree offsets.
+
+In an SA analysis with a non-zero origin the youngest tip is placed at height 0, while in the sRanges tree heights are measured in absolute time. To align the two, `SRangesAndSACladeSetComparator` takes the SA trace log with `-SALog <file>` and adds the value of its `offset` column to every node height of the corresponding SA tree. The log must have one line per tree in the SA tree file, in the same order, and the same burnin percentage is applied to both. Without `-SALog` the SA heights are used unchanged, which is only correct when the SA offset is zero.
+
+Both print a table of clades with their support and mean, lower and upper heights in each set, and can write an X-Y plot with `-png <file>`. Burnin is set with `-burnin`, and `-threshold` drops clades whose summed support is below the given value.
+
+### Plot legend
+
+The PNG plot overlays two scatter plots on the same square. The x axis refers to the first tree set and the y axis to the second.
+
+**Red dots** show clade support. A dot at (x, y) is a clade with posterior support x in the first set and y in the second. Dots on the black diagonal have equal support in both sets, the blue lines mark a 20% difference. Positions are jittered by a few pixels so that identical values do not hide each other.
+
+- Size grows with the summed support of the clade in both sets. Diameter is 1 + 10 * (support1 + support2) pixels, from 1 pixel for an almost absent clade to 21 pixels for a clade with full support in both sets.
+- Transparency is fixed at 25% opacity. Overlapping dots darken, so dense regions show where many clades have similar support.
+
+**Blue dots** show clade ages. A dot at (x, y) is a clade whose mean height is x in the first set and y in the second, scaled by the highest tree in either set (or by `-scaling`). Faint blue crosshair lines through each dot are the 95% HPD height intervals in each set.
+
+- Size grows with the higher of the two supports. Diameter is 3 + 13 * max(support1, support2) pixels, from 3 pixels for an almost absent clade to 16 pixels for a clade fully supported in at least one set.
+- Transparency grows with the mean support. Opacity is 0.1 + 0.9 * (support1 + support2) / 2, so a clade with full support in both sets is fully opaque and a clade barely present in either set is almost invisible. The HPD lines use the squared opacity and are only drawn when the summed support exceeds 0.1.
+
+The two dot types follow slightly different rules to limit overplotting. Support values cluster near 0 and 1, so many red dots land on the same spot; jitter, a fixed low opacity and a size that only grows with summed support keep these clusters readable as darker areas rather than one solid blob. Heights are continuous and spread across the plot, so blue dots are placed exactly and instead use opacity to fade out poorly supported clades, whose ages are noisy, while keeping well supported clades visible.
 
 ## Model Features
 
