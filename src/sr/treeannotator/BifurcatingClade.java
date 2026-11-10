@@ -72,14 +72,14 @@ public class BifurcatingClade implements SRClade {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         BifurcatingClade that = (BifurcatingClade) o;
-        // Order matters: T1 is ancestral, T2 is descendant
+        // Order doesn't matter
         return (Objects.equals(firstTaxa, that.firstTaxa) && Objects.equals(secondTaxa, that.secondTaxa))
         		|| (Objects.equals(firstTaxa, that.secondTaxa) && Objects.equals(secondTaxa, that.firstTaxa));
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(firstTaxa, secondTaxa);
+        return Objects.hash(firstTaxa, secondTaxa) + Objects.hash(secondTaxa, firstTaxa);
     }
 
     @Override

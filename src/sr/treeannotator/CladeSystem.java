@@ -149,7 +149,7 @@ public class CladeSystem implements TreeSummarizer {
 				Set<String> leftTaxa = collect(left, tree, withinRange, collectHeights);
 				Set<String> rightTaxa = collect(right, tree, withinRange, collectHeights);
 
-				if(!tree.useMixedSpeciationInput.get() || ((SRNode) node).isBudding()) {
+				if(!containsBifurcations || ((SRNode) node).isBudding()) {
 					// A budding node: either within a range (type 2) or not (type 1).
 
 					StratigraphicRange range = withinRange.get(node.getNr());
