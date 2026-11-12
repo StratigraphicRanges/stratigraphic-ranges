@@ -42,12 +42,9 @@ public class CladeSystem implements TreeSummarizer {
 	private final Map<WithinRangeBuddingClade, List<Double>> withinRangeHeights = new HashMap<>();
 	private final Map<SampledAncestorClade, List<Double>> sampledAncestorHeights = new HashMap<>();
 	private final Map<BifurcatingClade, List<Double>> bifurcatingHeights = new HashMap<>();
-	
-	boolean containsBifurcations = false;
 
 	@Override
 	public void add(SRTree tree, boolean collectHeights) {
-		if(!containsBifurcations && tree.useMixedSpeciationInput.get()) containsBifurcations = true;
 		Map<Integer, StratigraphicRange> withinRange = computeWithinRangeNodes(tree);
 		collect(tree.getRoot(), tree, withinRange, collectHeights);
 	}
@@ -149,7 +146,7 @@ public class CladeSystem implements TreeSummarizer {
 				Set<String> leftTaxa = collect(left, tree, withinRange, collectHeights);
 				Set<String> rightTaxa = collect(right, tree, withinRange, collectHeights);
 
-				if(!containsBifurcations || ((SRNode) node).isBudding()) {
+				if(((SRNode) node).isBudding()) {
 					// A budding node: either within a range (type 2) or not (type 1).
 
 					StratigraphicRange range = withinRange.get(node.getNr());
@@ -218,7 +215,7 @@ public class CladeSystem implements TreeSummarizer {
 			existing.incrementCount();
 		}
 	}
-	
+
 	private void addBifurcatingClade(BifurcatingClade clade) {
 		BifurcatingClade existing = bifurcatingMap.get(clade);
 		if (existing == null) {
@@ -284,10 +281,8 @@ public class CladeSystem implements TreeSummarizer {
 		for (SampledAncestorClade clade : sampledAncestorMap.values()) {
 			clade.setProbability((double) clade.getCount() / totalTrees);
 		}
-		if(containsBifurcations) {
-			for (BifurcatingClade clade : bifurcatingMap.values()) {
-				clade.setProbability((double) clade.getCount() / totalTrees);
-			}
+		for (BifurcatingClade clade : bifurcatingMap.values()) {
+			clade.setProbability((double) clade.getCount() / totalTrees);
 		}
 	}
 
@@ -309,13 +304,11 @@ public class CladeSystem implements TreeSummarizer {
 			SampledAncestorClade known = sampledAncestorMap.get(clade);
 			logScore += (known != null && known.getProbability() > 0) ? Math.log(known.getProbability()) : Math.log(1e-100);
 		}
-		if(containsBifurcations) {
-			for (BifurcatingClade clade : temp.bifurcatingMap.keySet()) {
-				BifurcatingClade known = bifurcatingMap.get(clade);
-				logScore += (known != null && known.getProbability() > 0) ? Math.log(known.getProbability()) : Math.log(1e-100);
-			}
+		for (BifurcatingClade clade : temp.bifurcatingMap.keySet()) {
+			BifurcatingClade known = bifurcatingMap.get(clade);
+			logScore += (known != null && known.getProbability() > 0) ? Math.log(known.getProbability()) : Math.log(1e-100);
 		}
-		
+
 		return logScore;
 	}
 
@@ -337,13 +330,11 @@ public class CladeSystem implements TreeSummarizer {
 			SampledAncestorClade known = sampledAncestorMap.get(clade);
 			if (known != null) sumScore += known.getProbability();
 		}
-		if(containsBifurcations) {
-			for (BifurcatingClade clade : temp.bifurcatingMap.keySet()) {
-				BifurcatingClade known = bifurcatingMap.get(clade);
-				if (known != null) sumScore += known.getProbability();
-			}
+		for (BifurcatingClade clade : temp.bifurcatingMap.keySet()) {
+			BifurcatingClade known = bifurcatingMap.get(clade);
+			if (known != null) sumScore += known.getProbability();
 		}
-		
+
 		return sumScore;
 	}
 
@@ -362,7 +353,7 @@ public class CladeSystem implements TreeSummarizer {
 		for (SampledAncestorClade clade : sampledAncestorMap.values()) {
 			sb.append(String.format("  %s: count=%d, prob=%.4f%n", clade, clade.getCount(), clade.getProbability()));
 		}
-		if(containsBifurcations) {
+		if(!bifurcatingMap.isEmpty()) {
 			sb.append("Bifurcating clades (T1, T2):\n");
 			for (BifurcatingClade clade : bifurcatingMap.values()) {
 				sb.append(String.format("  %s: count=%d, prob=%.4f%n", clade, clade.getCount(), clade.getProbability()));
@@ -425,40 +416,40 @@ public class CladeSystem implements TreeSummarizer {
 			} else {
 				Set<String> leftTaxa = annotateNode(left, tree, withinRange, details);
 				Set<String> rightTaxa = annotateNode(right, tree, withinRange, details);
-				
+
 				if(!tree.useMixedSpeciationInput.get() || ((SRNode) node).isBudding()) {
 
-				StratigraphicRange range = withinRange.get(node.getNr());
-				if (range != null) {
-					String rangeTaxon = getTaxonBaseName(range.getLastOccurrenceID());
-					Set<String> t1 = new TreeSet<>(leftTaxa);
-					Set<String> t2 = new TreeSet<>(rightTaxa);
-					t1.remove(rangeTaxon);
-					t2.remove(rangeTaxon);
+					StratigraphicRange range = withinRange.get(node.getNr());
+					if (range != null) {
+						String rangeTaxon = getTaxonBaseName(range.getLastOccurrenceID());
+						Set<String> t1 = new TreeSet<>(leftTaxa);
+						Set<String> t2 = new TreeSet<>(rightTaxa);
+						t1.remove(rangeTaxon);
+						t2.remove(rangeTaxon);
 
-					WithinRangeBuddingClade clade = withinRangeMap.get(new WithinRangeBuddingClade(rangeTaxon, t1, t2));
-					if (clade != null) {
-						node.setMetaData("posterior", clade.getProbability());
-						if (details) {
-							node.setMetaData("clade_type", clade.getType());
-							node.setMetaData("range_taxon", rangeTaxon);
-							node.setMetaData("ancestral_taxa", formatTaxaSet(t1));
-							node.setMetaData("descendant_taxa", formatTaxaSet(t2));
+						WithinRangeBuddingClade clade = withinRangeMap.get(new WithinRangeBuddingClade(rangeTaxon, t1, t2));
+						if (clade != null) {
+							node.setMetaData("posterior", clade.getProbability());
+							if (details) {
+								node.setMetaData("clade_type", clade.getType());
+								node.setMetaData("range_taxon", rangeTaxon);
+								node.setMetaData("ancestral_taxa", formatTaxaSet(t1));
+								node.setMetaData("descendant_taxa", formatTaxaSet(t2));
+							}
+							annotateHeightStatistics(node, withinRangeHeights.get(clade));
 						}
-						annotateHeightStatistics(node, withinRangeHeights.get(clade));
-					}
-				} else {
-					BuddingClade clade = buddingMap.get(new BuddingClade(leftTaxa, rightTaxa));
-					if (clade != null) {
-						node.setMetaData("posterior", clade.getProbability());
-						if (details) {
-							node.setMetaData("clade_type", clade.getType());
-							node.setMetaData("ancestral_taxa", formatTaxaSet(leftTaxa));
-							node.setMetaData("descendant_taxa", formatTaxaSet(rightTaxa));
+					} else {
+						BuddingClade clade = buddingMap.get(new BuddingClade(leftTaxa, rightTaxa));
+						if (clade != null) {
+							node.setMetaData("posterior", clade.getProbability());
+							if (details) {
+								node.setMetaData("clade_type", clade.getType());
+								node.setMetaData("ancestral_taxa", formatTaxaSet(leftTaxa));
+								node.setMetaData("descendant_taxa", formatTaxaSet(rightTaxa));
+							}
+							annotateHeightStatistics(node, buddingHeights.get(clade));
 						}
-						annotateHeightStatistics(node, buddingHeights.get(clade));
 					}
-				}
 				} else {
 					BifurcatingClade clade = bifurcatingMap.get(new BifurcatingClade(leftTaxa, rightTaxa));
 					if (clade != null) {
@@ -554,7 +545,7 @@ public class CladeSystem implements TreeSummarizer {
 	public Map<BuddingClade, BuddingClade> getBuddingMap() {
 		return buddingMap;
 	}
-	
+
 	public Map<BifurcatingClade, BifurcatingClade> getBifurcatingMap() {
 		return bifurcatingMap;
 	}

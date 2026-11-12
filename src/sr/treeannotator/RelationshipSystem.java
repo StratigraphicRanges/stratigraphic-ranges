@@ -28,8 +28,6 @@ public class RelationshipSystem implements TreeSummarizer {
 	private Map<OrientationRelationship, List<Double>> orientationHeights;
 	private Map<NoOrientationRelationship, List<Double>> noOrientationHeights = new HashMap<>();
 
-	boolean containsBifurcations = false;
-
 	public RelationshipSystem() {
 		this.ancestryMap = new HashMap<>();
 		this.orientationMap = new HashMap<>();
@@ -43,7 +41,6 @@ public class RelationshipSystem implements TreeSummarizer {
 	 * @param tree The SR tree to process
 	 */
 	public void add(SRTree tree) {
-		if(!containsBifurcations && tree.useMixedSpeciationInput.get()) containsBifurcations = true;
 		collectRelationships(tree.getRoot(), tree);
 	}
 
@@ -54,7 +51,6 @@ public class RelationshipSystem implements TreeSummarizer {
 	 * @param collectHeights If true, collect node heights for relationships
 	 */
 	public void add(SRTree tree, boolean collectHeights) {
-		if(!containsBifurcations && tree.useMixedSpeciationInput.get()) containsBifurcations = true;
 		if (collectHeights) {
 			collectRelationshipsWithHeights(tree.getRoot(), tree);
 		} else {
@@ -146,7 +142,7 @@ public class RelationshipSystem implements TreeSummarizer {
 					}
 				}
 			} else {
-				if(containsBifurcations && !((SRNode) node).isBudding()) {
+				if(!((SRNode) node).isBudding()) {
 					// Budding node - orientation relationship (left=ancestral, right=descendant)
 
 					// We do not include the taxon of the range in the orientation relationship because we
@@ -411,6 +407,14 @@ public class RelationshipSystem implements TreeSummarizer {
 		for (OrientationRelationship rel : orientationMap.values()) {
 			sb.append(String.format("  %s: count=%d, prob=%.4f\n",
 					rel.toString(), rel.getCount(), rel.getProbability()));
+		}
+		
+		if(!noOrientationMap.isEmpty()) {
+			sb.append("\nNon-oriented Relationships:\n");
+			for (NoOrientationRelationship rel : noOrientationMap.values()) {
+				sb.append(String.format("  %s: count=%d, prob=%.4f\n",
+						rel.toString(), rel.getCount(), rel.getProbability()));
+			}
 		}
 		return sb.toString();
 	}
