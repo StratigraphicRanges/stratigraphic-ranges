@@ -354,7 +354,7 @@ public class CladeSystem implements TreeSummarizer {
 			sb.append(String.format("  %s: count=%d, prob=%.4f%n", clade, clade.getCount(), clade.getProbability()));
 		}
 		if(!bifurcatingMap.isEmpty()) {
-			sb.append("Bifurcating clades (T1, T2):\n");
+			sb.append("\nBifurcating clades (T1, T2):\n");
 			for (BifurcatingClade clade : bifurcatingMap.values()) {
 				sb.append(String.format("  %s: count=%d, prob=%.4f%n", clade, clade.getCount(), clade.getProbability()));
 			}
